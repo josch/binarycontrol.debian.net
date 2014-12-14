@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+import cgi
+import cgitb
+import html
+cgitb.enable()
+
+WWWROOT="/var/www"
+CACHE=os.path.join(WWWROOT, "cache")
+CSEARCHINDEX=os.path.join(WWWROOT, "csearchindex")
+
+form = cgi.FieldStorage()
+query = form.getfirst("q", "")
+path = form.getfirst("path", "")
+outformat = form.getfirst("format", "")
+
+htmltmpl = """Content-Type: text/html
+
+<html>
+<body>
+<h1>codesearch for Debian binary control data</h1>
+<p>Web front-end for a csearch (apt-get install codesearch) command running on
+all unpacked Debian Sid amd64 binary package control data.</p>
+<p>The md5sums files have been removed as they occupy most space without any
+utility. If you want to search for packages by their hash, use
+<a href="http://dedup.debian.net/">dedup.debian.net</a>. If you want to find
+binary packages without a md5sums file, have a look at the
+<a href="https://lintian.debian.org/tags/no-md5sums-control-file.html">no-md5sums-control-file lintian tag</a></p>
+<p>The query and path parameters support RE2 regular expressions. The query
+field can be empty in which case all packages containing the specified path
+will be found regardless of their content. Example: all packages with the file
+"clilibs": <a href="?path=%%2Fclilibs%%24">?path=/clilibs$</a></p>
+<p>You can limit your search to a certain list of packages by using the
+path field. Example: search for all "liba*" packages containing the file
+"conffiles": <a href="?path=%%2Fliba[^%%2F]*%%2Fconffiles">?path=/liba[^/]*/conffiles</a></p>
+<p>You can change the output format from html with clickable links to the
+found files to a plain text list by appending the "&format=plain" parameter
+or to a plain text list of the containing packages by appending the
+"&format=pkglist" parameter to your query.</p>
+<p>This service is only temporary (famous last words) until
+<a href="http://codesearch.debian.net">codesearch.debian.net</a> adds
+<a href="https://github.com/Debian/dcs/issues/35">support for searching for packages containing a path only</a>
+and <a href="https://github.com/Debian/dcs/issues/36">supports a machine readable interface</a>
+and supports searching binary control data in addition to source code.</p>
+<form action="/" method="GET">
+query: <input type="text" name="q" value="{query}"><br>
+path: <input type="text" name="path" value="{path}"><br>
+<input type="submit"><br>
+</form>
+%s
+<hr>
+<ul>
+<li>Maintainer: </li>
+<li>Source: </li>
+</ul>
+</body>
+</html>
+""".format(query=html.escape(query), path=html.escape(path))
+
+if query or path and outformat in ["", "plain", "pkglist"]:
+    try:
+        result = subprocess.check_output(['csearch', '-f', path, '-l', query],
+                                         env={"CSEARCHINDEX":CSEARCHINDEX})
+    except subprocess.CalledProcessError:
+        result = None
+    else:
+        result = result.decode()
+        result = result.split()
+        result = [os.path.relpath(p, CACHE) for p in result]
+else:
+    result = None
+
+if outformat == "":
+    if result:
+        result = ['<a href="/cache/%s">%s</a>'%(p,p) for p in result]
+        result = '<br>'.join(result)
+        result = "<h1>Results</h1>"+result
+        print(htmltmpl%result)
+    else:
+        if query or path:
+            print(htmltmpl%"<h1>no results</h1>")
+        else:
+            print(htmltmpl%"")
+elif outformat == "plain":
+    if result:
+        result = "\n".join(result)
+    else:
+        result = ""
+    print("Content-Type: text/plain")
+    print()
+    print(result)
+elif outformat == "pkglist":
+    if result:
+        result = set([r.split("/")[0] for r in result])
+        result = sorted(result)
+        result = "\n".join(result)
+    else:
+        result = ""
+    print("Content-Type: text/plain")
+    print()
+    print(result)
+else:
+    print("Content-Type: text/plain")
+    print()
+    print("unknown format")
