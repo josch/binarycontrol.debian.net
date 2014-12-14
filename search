@@ -52,8 +52,8 @@ path: <input type="text" name="path" value="{path}"><br>
 %s
 <hr>
 <ul>
-<li>Maintainer: </li>
-<li>Source: </li>
+<li>Contact: Johannes 'josch' Schauer &lt;j.schauer@email.de&gt;</li>
+<li>Source: https://github.com/josch/binarycontrol.debian.net</li>
 </ul>
 </body>
 </html>

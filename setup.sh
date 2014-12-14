@@ -43,10 +43,19 @@ apt-get $APT_OPTS update
 
 mkdir -p cache.tmp
 
+# for all available package, get the download url and feed that one
+# to ./download_unpack.sh
+#
+# the first xargs makes sure to run `apt-get download` with multiple
+# packages at a time as it would otherwise be the bottleneck
+#
+# the second xargs distributes the downloads to more than one process
+# at a time. This number could be higher but is as low as it is to not
+# max out cpu usage
 apt-cache $APT_OPTS dumpavail | awk '/^Package:/ {print $2}' | sort \
 	| xargs apt-get $APT_OPTS --print-uris download \
 	| sed -ne "s/^'\([^']\+\)'\s\+\([^_]\+\)_.*/\2 \1/p" \
-	| xargs --max-procs=8 --max-args=2 ./download_unpack.sh
+	| xargs --max-procs=2 --max-args=2 ./download_unpack.sh
 
 rm -rf cache csearchindex
 mv cache.tmp cache
