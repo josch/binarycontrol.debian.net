@@ -12,4 +12,4 @@ echo "working on $pkg" >&2
 
 mkdir -p "cache.tmp/$pkg"
 
-curl --location --silent "$url" | ./extract_binary_control.py | tar -C "cache.tmp/$pkg" --exclude=./md5sums -xz
+curl --retry 2 --location --silent "$url" | dpkg-deb --ctrl-tarfile /dev/stdin | tar -C "cache.tmp/$pkg" --exclude=./md5sums -x

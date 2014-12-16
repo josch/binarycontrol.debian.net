@@ -18,8 +18,6 @@ Requirements
 ============
 
  - a web server (I use nginx and fcgiwrap)
- - python3
- - python3-arpy
  - codesearch
 
 License

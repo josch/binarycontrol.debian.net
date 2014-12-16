@@ -55,6 +55,7 @@ mkdir -p cache.tmp
 apt-cache $APT_OPTS dumpavail | awk '/^Package:/ {print $2}' | sort \
 	| xargs apt-get $APT_OPTS --print-uris download \
 	| sed -ne "s/^'\([^']\+\)'\s\+\([^_]\+\)_.*/\2 \1/p" \
+	| sort \
 	| xargs --max-procs=2 --max-args=2 ./download_unpack.sh
 
 rm -rf cache csearchindex
