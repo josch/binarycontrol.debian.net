@@ -22,7 +22,14 @@ htmltmpl = """Content-Type: text/html
 <body>
 <h1>codesearch for Debian binary control data</h1>
 <p>Web front-end for a csearch (apt-get install codesearch) command running on
-all unpacked Debian Sid amd64 binary package control data.</p>
+all unpacked Debian Sid and Testing amd64 binary package control data.</p>
+<p>The directory structure indexed by csearch has the suite (testing and
+unstable) at the root and contain each the names of all binary packages in the
+suites, respectively. Each of these directories then contains the contents of
+respective binary package control data.</p>
+<p>The csearch binary is run with arguments supplied by the GET parameters q
+(which is used as the -l parameter) and path (which is used as the -f
+parameter).</p>
 <p>The md5sums files have been removed as they occupy most space without any
 utility. If you want to search for packages by their hash, use
 <a href="http://dedup.debian.net/">dedup.debian.net</a>. If you want to find
@@ -35,6 +42,9 @@ will be found regardless of their content. Example: all packages with the file
 <p>You can limit your search to a certain list of packages by using the
 path field. Example: search for all "liba*" packages containing the file
 "conffiles": <a href="?path=%%2Fliba[^%%2F]*%%2Fconffiles">?path=/liba[^/]*/conffiles</a></p>
+<p>You can limit your search to a certain suite by prefixing the path with
+the suite name. Example: same as before but limited to unstable:
+"conffiles": <a href="?path=%%2Funstable%%2Fliba[^%%2F]*%%2Fconffiles">?path=/unstable/liba[^/]*/conffiles</a></p>
 <p>You can change the output format from html with clickable links to the
 found files to a plain text list by appending the "&format=plain" parameter
 or to a plain text list of the containing packages by appending the
@@ -93,7 +103,7 @@ elif outformat == "plain":
     print(result)
 elif outformat == "pkglist":
     if result:
-        result = set([r.split("/")[0] for r in result])
+        result = set([r.split("/")[1] for r in result])
         result = sorted(result)
         result = "\n".join(result)
     else:
