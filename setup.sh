@@ -5,43 +5,47 @@ set -x
 ARCH="amd64"
 MIRROR="http://http.debian.net/debian"
 
-#FIXME: if the host has more than one arch enabled then those Packages files will be downloaded as well
-
 rm -rf cache.tmp
 mkdir -p cache.tmp
 
+# this could be done with chdist but we want to keep the dependencies minimal
 for SUITE in "testing" "unstable"; do
 	DIRECTORY="`pwd`/debian-$SUITE-$ARCH"
-	APT_OPTS=""
-	APT_OPTS=$APT_OPTS" -o Apt::Architecture=$ARCH"
-	APT_OPTS=$APT_OPTS" -o Dir::Etc::TrustedParts=$DIRECTORY/etc/apt/trusted.gpg.d"
-	APT_OPTS=$APT_OPTS" -o Dir::Etc::Trusted=$DIRECTORY/etc/apt/trusted.gpg"
-	APT_OPTS=$APT_OPTS" -o Dir=$DIRECTORY/"
-	APT_OPTS=$APT_OPTS" -o Dir::Etc=$DIRECTORY/etc/apt/"
-	APT_OPTS=$APT_OPTS" -o Dir::Etc::SourceList=$DIRECTORY/etc/apt/sources.list"
-	APT_OPTS=$APT_OPTS" -o Dir::State=$DIRECTORY/var/lib/apt/"
-	APT_OPTS=$APT_OPTS" -o Dir::State::Status=$DIRECTORY/var/lib/dpkg/status"
-	APT_OPTS=$APT_OPTS" -o Dir::Cache=$DIRECTORY/var/cache/apt/"
-	APT_OPTS=$APT_OPTS" -o Acquire::Check-Valid-Until=false" # because we use snapshot
 
-	mkdir -p $DIRECTORY
-	mkdir -p $DIRECTORY/etc/apt/
+	export APT_CONFIG=$DIRECTORY/etc/apt/apt.conf
+
 	mkdir -p $DIRECTORY/etc/apt/trusted.gpg.d/
+	mkdir -p $DIRECTORY/etc/apt/apt.conf.d/
 	mkdir -p $DIRECTORY/etc/apt/sources.list.d/
 	mkdir -p $DIRECTORY/etc/apt/preferences.d/
-	mkdir -p $DIRECTORY/var/lib/apt/
 	mkdir -p $DIRECTORY/var/lib/apt/lists/partial/
 	mkdir -p $DIRECTORY/var/lib/dpkg/
-	mkdir -p $DIRECTORY/var/cache/apt/
 	mkdir -p $DIRECTORY/var/cache/apt/apt-file/
+	mkdir -p $DIRECTORY/var/cache/apt/archives/partial
 
-	cp /etc/apt/trusted.gpg.d/* $DIRECTORY/etc/apt/trusted.gpg.d/
+	# we have to also set Apt::Architectures to avoid foreign architectures
+	# from the host influencing this
+	cat << END > "$APT_CONFIG"
+Apt {
+   Architecture "$ARCH";
+   Architectures "$ARCH";
+};
+
+Dir "$DIRECTORY";
+Dir::State::status "$DIRECTORY/var/lib/dpkg/status";
+
+Acquire::Check-Valid-Until false;
+END
+
+	for keyring in debian-archive-keyring.gpg debian-archive-removed-keys.gpg; do
+		cp /usr/share/keyrings/$keyring $DIRECTORY/etc/apt/trusted.gpg.d/
+	done
 
 	touch $DIRECTORY/var/lib/dpkg/status
 
 	echo deb $MIRROR $SUITE main > $DIRECTORY/etc/apt/sources.list
 
-	apt-get $APT_OPTS update
+	apt-get update
 
 	# for all available package, get the download url and feed that one
 	# to ./download_unpack.sh
@@ -52,8 +56,8 @@ for SUITE in "testing" "unstable"; do
 	# the second xargs distributes the downloads to more than one process
 	# at a time. This number could be higher but is as low as it is to not
 	# max out cpu usage
-	apt-cache $APT_OPTS dumpavail | awk '/^Package:/ {print $2}' | sort \
-		| xargs apt-get $APT_OPTS --print-uris download \
+	apt-cache dumpavail | awk '/^Package:/ {print $2}' | sort \
+		| xargs apt-get --print-uris download \
 		| sed -ne "s/^'\([^']\+\)'\s\+\([^_]\+\)_.*/\2 $SUITE \1/p" \
 		| sort \
 		| xargs --max-procs=2 --max-args=3 ./download_unpack.sh
